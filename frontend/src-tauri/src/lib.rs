@@ -10,10 +10,10 @@ const OLLAMA_PORT: u16 = 11434;
 const JARVIS_PORT: u16 = 8000;
 #[cfg(not(all(target_os = "windows", target_arch = "aarch64")))]
 const DESKTOP_UV_SYNC_COMMAND: &str =
-    "uv sync --extra desktop --extra inference-cloud --extra inference-google --group desktop-native";
+    "uv sync --extra desktop --extra inference-cloud --extra inference-google --extra voice";
 #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
 const DESKTOP_UV_SYNC_COMMAND: &str =
-    "uv sync --python cpython-3.12-windows-x86_64-none --extra desktop --extra inference-cloud --extra inference-google --group desktop-native";
+    "uv sync --python cpython-3.12-windows-x86_64-none --extra desktop --extra inference-cloud --extra inference-google --extra voice";
 
 /// Small, fast model used when startup needs a default Ollama tag.
 const STARTUP_MODEL: &str = "qwen3.5:4b";
@@ -307,6 +307,7 @@ fn find_project_root() -> Option<std::path::PathBuf> {
     // 3. Fallback: well-known direct paths
     let home = home_dir();
     let direct = [
+        format!("{home}/JarvisPessoal"),
         format!("{home}/OpenJarvis"),
         format!("{home}/projects/hazy/OpenJarvis"),
         format!("{home}/projects/OpenJarvis"),
@@ -991,6 +992,7 @@ fn add_cargo_bin_to_path(cmd: &mut tokio::process::Command) {
     }
 }
 
+#[allow(dead_code)]
 async fn verify_openjarvis_rust_extension(
     root: &std::path::Path,
     uv_bin: &str,
@@ -1296,7 +1298,7 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
             return;
         }
 
-        let target_path = std::path::PathBuf::from(home_dir()).join("OpenJarvis");
+        let target_path = std::path::PathBuf::from(home_dir()).join("JarvisPessoal");
         let clone_target = target_path.display().to_string();
 
         // If the directory exists but is not a valid project, don't overwrite
@@ -1312,7 +1314,7 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
 
         {
             let mut s = status.lock().await;
-            s.detail = "Downloading OpenJarvis (first launch)...".into();
+            s.detail = "Baixando o Jarvis (primeira vez)...".into();
         }
 
         let mut clone_cmd = tokio::process::Command::new(&git_bin);
@@ -1321,7 +1323,7 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
                 "clone",
                 "--depth",
                 "1",
-                "https://github.com/open-jarvis/OpenJarvis.git",
+                "https://github.com/Ph20sr/jarvis-pessoal.git",
                 &clone_target,
             ])
             .stdout(std::process::Stdio::null())
@@ -1339,7 +1341,7 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
                     let mut s = status.lock().await;
                     s.error = Some(format!(
                         "Failed to download OpenJarvis: {}. \
-                         Clone manually: git clone https://github.com/open-jarvis/OpenJarvis.git {}",
+                         Clone manually: git clone https://github.com/Ph20sr/jarvis-pessoal.git {}",
                         stderr.trim(),
                         clone_target,
                     ));
@@ -1349,7 +1351,7 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
                     let mut s = status.lock().await;
                     s.error = Some(format!(
                         "Failed to download OpenJarvis: {}. \
-                         Clone manually: git clone https://github.com/open-jarvis/OpenJarvis.git {}",
+                         Clone manually: git clone https://github.com/Ph20sr/jarvis-pessoal.git {}",
                         e, clone_target,
                     ));
                     return;
@@ -1535,10 +1537,11 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
             "inference-cloud",
             "--extra",
             "inference-google",
-            // openjarvis_rust lives in a uv dependency group (not the published
-            // `desktop` extra) so pip installs from PyPI don't require it (#584).
-            "--group",
-            "desktop-native",
+            "--extra",
+            "voice",
+            // Jarvis Pessoal: sem `--group desktop-native` — a extensão Rust
+            // exigiria Rust + Visual Studio no PC do usuário, e o servidor
+            // funciona sem ela.
         ])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped())
@@ -1564,14 +1567,25 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
         Ok(_) => {} // success — fall through
     }
 
-    {
-        let mut s = status.lock().await;
-        s.detail = "Verifying Rust extension (openjarvis_rust)...".into();
-    }
-    if let Err(err) = verify_openjarvis_rust_extension(root, &uv_bin).await {
-        let mut s = status.lock().await;
-        s.error = Some(err);
-        return;
+    // Jarvis Pessoal: aplica o preset em português na primeira vez.
+    let user_config = std::path::PathBuf::from(home_dir())
+        .join(".openjarvis")
+        .join("config.toml");
+    if !user_config.exists() {
+        {
+            let mut s = status.lock().await;
+            s.detail = "Configurando o Jarvis em português...".into();
+        }
+        let mut init_cmd = tokio::process::Command::new(&uv_bin);
+        init_cmd
+            .args(["run", "jarvis", "init", "--preset", "jarvis-pt", "--force"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .current_dir(root);
+        prepare_subprocess_for_appimage(&mut init_cmd);
+        prepare_backend_python(&mut init_cmd);
+        init_cmd.kill_on_drop(true);
+        let _ = init_cmd.output().await;
     }
 
     {
@@ -3379,7 +3393,7 @@ pub fn run() {
             let health = MenuItemBuilder::with_id("health", "Health: starting...")
                 .enabled(false)
                 .build(app)?;
-            let quit = MenuItemBuilder::with_id("quit", "Quit OpenJarvis").build(app)?;
+            let quit = MenuItemBuilder::with_id("quit", "Sair do Jarvis").build(app)?;
 
             let menu = MenuBuilder::new(app)
                 .item(&show)
@@ -3391,7 +3405,7 @@ pub fn run() {
 
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("OpenJarvis")
+                .tooltip("Jarvis")
                 .menu(&menu)
                 .on_menu_event(move |app, event| match event.id().as_ref() {
                     "show" => {
