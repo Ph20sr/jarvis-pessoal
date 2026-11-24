@@ -8,6 +8,11 @@
 [engine]
 default = "ollama"
 
+# O vLLM usa a porta 8000 por padrão, a mesma do servidor do Jarvis; sem isto o
+# Jarvis "encontra" a si mesmo e lista modelos que não existem nesta máquina.
+[engine.vllm]
+host = "http://127.0.0.1:8001"
+
 [intelligence]
 # Modelo local. Troque conforme sua máquina:
 #   qwen3.5:4b  -> leve, roda em quase qualquer PC (8 GB de RAM)

@@ -156,7 +156,11 @@ func main() {
 		}
 	} else if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
 		say("Procurando atualizações...")
-		_ = run(dir, "git", "pull", "--ff-only")
+		// a pasta é gerenciada pelo Jarvis.exe: alinha com o GitHub mesmo que
+		// o npm ou o antivírus tenham mexido em algum arquivo
+		if run(dir, "git", "fetch", "--depth", "1", "origin", "main") == nil {
+			_ = run(dir, "git", "reset", "--hard", "origin/main")
+		}
 	}
 
 	// 3. dependências do Python
@@ -169,7 +173,9 @@ func main() {
 	// 4. configuração em português
 	if _, err := os.Stat(filepath.Join(home, ".openjarvis", "config.toml")); err != nil {
 		say("Configurando em português, local e grátis...")
-		_ = run(dir, "uv", "run", "jarvis", "init", "--preset", "jarvis-pt", "--force")
+		if err := run(dir, "uv", "run", "jarvis", "init", "--preset", "jarvis-pt", "--force"); err != nil {
+			say("AVISO: não consegui aplicar a configuração em português (veja acima).")
+		}
 	}
 
 	// 5. modelo de IA
@@ -181,6 +187,7 @@ func main() {
 	// 6. abre a tela de comando
 	fmt.Println()
 	say("Abrindo a tela de comando. Deixe esta janela aberta enquanto usa o Jarvis.")
+	say("O núcleo leva uns 30 segundos para ligar: se a tela mostrar erro de conexão no começo, espere.")
 	fmt.Println()
 	if err := run(dir, "uv", "run", "jarvis", "gui"); err != nil {
 		fail("O Jarvis fechou com erro. Veja as mensagens acima.")
