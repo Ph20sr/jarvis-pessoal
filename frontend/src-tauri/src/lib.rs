@@ -921,6 +921,10 @@ fn rust_toolchain_install_hint() -> &'static str {
     allow(unused_variables)
 )]
 fn prepare_backend_python(cmd: &mut tokio::process::Command) {
+    // Jarvis Pessoal: fixa o Python 3.12 gerenciado pelo uv. Em alguns PCs o
+    // CPython 3.13 do uv falha ao criar o ambiente temporário de build.
+    #[cfg(not(all(target_os = "windows", target_arch = "aarch64")))]
+    cmd.env("UV_PYTHON", "3.12");
     #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
     {
         cmd.env("UV_PYTHON", "cpython-3.12-windows-x86_64-none");
@@ -1504,6 +1508,31 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
     let root = project_root.as_ref().unwrap();
 
     // Jarvis Pessoal: não exige Rust/cargo — a extensão nativa não é usada.
+
+    // Jarvis Pessoal: atualiza o projeto a cada abertura (sem travar se falhar).
+    if root.join(".git").exists() {
+        {
+            let mut s = status.lock().await;
+            s.detail = "Procurando atualizações do Jarvis...".into();
+        }
+        let git_bin = resolve_bin("git");
+        for args in [
+            vec!["fetch", "--depth", "1", "origin", "main"],
+            vec!["reset", "--hard", "origin/main"],
+        ] {
+            let mut git_cmd = tokio::process::Command::new(&git_bin);
+            git_cmd
+                .args(&args)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .current_dir(root);
+            prepare_subprocess_for_appimage(&mut git_cmd);
+            git_cmd.kill_on_drop(true);
+            if !matches!(git_cmd.output().await, Ok(o) if o.status.success()) {
+                break;
+            }
+        }
+    }
 
     // Install dependencies automatically (handles fresh clones).
     //
