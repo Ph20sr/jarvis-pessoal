@@ -1,5 +1,7 @@
 # Jarvis Pessoal
 
+![Tela de comando](assets/jarvis-pessoal-hud.png)
+
 Assistente pessoal por voz, em português, que roda no seu PC. É construído em cima do [OpenJarvis](https://github.com/open-jarvis/openjarvis) (Stanford, licença Apache 2.0), com estas adições:
 
 - **Tela de comando (HUD)** em `/hud`: núcleo animado que muda de cor quando escuta, pensa e fala, espectro de áudio ao vivo, cards de relógio, clima e sistema, conversa e registro de atividades. Abre sozinha ao iniciar.
