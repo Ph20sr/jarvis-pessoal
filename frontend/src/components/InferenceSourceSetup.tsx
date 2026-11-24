@@ -1,4 +1,4 @@
-import { useReducer, useState, type FormEvent } from 'react';
+import { useEffect, useReducer, useRef, useState, type FormEvent } from 'react';
 import { ArrowLeft, Cpu, Download, Loader2, Server, ShieldCheck } from 'lucide-react';
 import {
   resetInferenceSource,
@@ -340,10 +340,29 @@ export function CustomEndpointSetup({
   );
 }
 
+/** Modelo padrão do Jarvis Pessoal (já baixado pelo instalador/Ollama). */
+const JARVIS_DEFAULT_MODEL = 'qwen3.5:4b';
+
 export function InferenceSourceSetup({ onStarted }: { onStarted: () => void }) {
   const [step, dispatch] = useReducer(inferenceSetupReducer, 'choose');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Jarvis Pessoal: o usuário só usa o Ollama local, então liga direto sem
+  // perguntar. Se falhar, cai na tela de escolha mostrando o erro.
+  const [auto, setAuto] = useState(true);
+  const autoStarted = useRef(false);
+
+  useEffect(() => {
+    if (autoStarted.current) return;
+    autoStarted.current = true;
+    persistAndStartInferenceSource({ kind: 'ollama', model: JARVIS_DEFAULT_MODEL })
+      .then(onStarted)
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : String(err));
+        setAuto(false);
+        dispatch('choose_ollama');
+      });
+  }, [onStarted]);
 
   const begin = async (source: InferenceSourceSubmission) => {
     setBusy(true);
@@ -357,6 +376,19 @@ export function InferenceSourceSetup({ onStarted }: { onStarted: () => void }) {
     }
   };
 
+  if (auto) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center" style={{ background: 'var(--color-bg)' }}>
+        <div className="flex flex-col items-center gap-4 text-center px-6">
+          <Loader2 size={36} className="animate-spin" style={{ color: 'var(--color-accent)' }} />
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text)' }}>Ligando o Jarvis...</h1>
+          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+            Na primeira vez isso pode levar alguns minutos.
+          </p>
+        </div>
+      </div>
+    );
+  }
   if (step === 'ollama') {
     return (
       <OllamaConsent

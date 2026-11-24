@@ -12,9 +12,9 @@ import { isEmbedOnlyModel } from '../lib/model-capabilities';
 import { InferenceRecoveryButton, InferenceSourceSetup } from './InferenceSourceSetup';
 
 const STEPS = [
-  { key: 'ollama_ready', label: 'Inference Engine', icon: Cpu, detail: 'Starting Ollama...' },
-  { key: 'model_ready', label: 'AI Model', icon: Database, detail: 'Loading model...' },
-  { key: 'server_ready', label: 'API Server', icon: Server, detail: 'Starting server...' },
+  { key: 'ollama_ready', label: 'Motor de IA', icon: Cpu, detail: 'Ligando o Ollama...' },
+  { key: 'model_ready', label: 'Modelo de IA', icon: Database, detail: 'Carregando o modelo...' },
+  { key: 'server_ready', label: 'Núcleo do Jarvis', icon: Server, detail: 'Ligando o núcleo...' },
 ] as const;
 
 type StepKey = (typeof STEPS)[number]['key'];
@@ -58,7 +58,7 @@ function StepRow({
           {label}
         </div>
         <div className="text-xs truncate" style={{ color: 'var(--color-text-tertiary)', maxWidth: '280px' }}>
-          {done ? 'Ready' : active ? detail : 'Waiting...'}
+          {done ? 'Pronto' : active ? detail : 'Aguardando...'}
         </div>
       </div>
       <div className="shrink-0">
@@ -178,10 +178,10 @@ export function SetupScreen({ onReady }: { onReady: () => void }) {
           </h1>
           <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
             {!statusChecked
-              ? 'Checking your saved setup...'
+              ? 'Verificando a configuração...'
               : status?.source === 'custom'
                 ? 'Connecting to your AI server...'
-                : 'Setting up your local AI...'}
+                : 'Ligando o Jarvis...'}
           </p>
         </div>
 
