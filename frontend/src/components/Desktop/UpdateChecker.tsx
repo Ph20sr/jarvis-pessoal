@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 type UpdateState = 'idle' | 'available' | 'downloading' | 'ready' | 'error';
 
-const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutos
 const DISABLED_KEY = 'oj-auto-update-disabled';
 
 export function isAutoUpdateDisabled(): boolean {
@@ -30,20 +30,22 @@ export function UpdateChecker() {
   const [errorMsg, setErrorMsg] = useState('');
   const [dismissed, setDismissed] = useState(false);
   const updateRef = useRef<any>(null);
+  const handleDownloadRef = useRef<(() => Promise<void>) | null>(null);
 
   const checkForUpdate = useCallback(async () => {
-    if (isAutoUpdateDisabled()) return;
+    if (isAutoUpdateDisabled() || updateRef.current) return;
     try {
-      const { check } = await import('@tauri-apps/plugin-updater');
-      const update = await check();
-      if (update) {
-        updateRef.current = update;
-        setVersion(update.version);
-        setState('available');
+      const { invoke } = await import('@tauri-apps/api/core');
+      const latest = await invoke<string | null>('jarvis_check_update');
+      if (latest) {
+        updateRef.current = latest;
+        setVersion(latest);
         setDismissed(false);
+        // Jarvis Pessoal: atualiza sozinho, sem perguntar.
+        void handleDownloadRef.current?.();
       }
     } catch {
-      // Silently ignore — likely running in browser or no update available
+      // Sem internet ou sem versão publicada: tenta de novo mais tarde.
     }
   }, []);
 
@@ -69,41 +71,30 @@ export function UpdateChecker() {
   }, [checkForUpdate]);
 
   const handleDownload = useCallback(async () => {
-    const update = updateRef.current;
-    if (!update) return;
-
+    if (!updateRef.current) return;
     setState('downloading');
     setProgress(0);
-
     try {
-      let downloaded = 0;
-      const contentLength = update.contentLength ?? 0;
-
-      await update.downloadAndInstall((event: any) => {
-        if (event.event === 'Progress') {
-          downloaded += event.data?.chunkLength ?? 0;
-          if (contentLength > 0) {
-            setProgress(Math.min(100, Math.round((downloaded / contentLength) * 100)));
-          }
-        } else if (event.event === 'Finished') {
-          setProgress(100);
-        }
-      });
-
+      const { invoke } = await import('@tauri-apps/api/core');
+      // Baixa, instala em silêncio e reabre o Jarvis (o app fecha sozinho).
+      await invoke('jarvis_install_update');
       setState('ready');
     } catch (e: any) {
-      setErrorMsg(e?.message || 'Download failed');
+      updateRef.current = null;
+      setErrorMsg(e?.message || String(e) || 'falha no download');
       setState('error');
       setTimeout(() => setState('idle'), 5000);
     }
   }, []);
+
+  handleDownloadRef.current = handleDownload;
 
   const handleRelaunch = useCallback(async () => {
     try {
       const { relaunch } = await import('@tauri-apps/plugin-process');
       await relaunch();
     } catch {
-      setErrorMsg('Please restart the application manually');
+      setErrorMsg('feche e abra o Jarvis de novo');
       setState('error');
       setTimeout(() => setState('idle'), 5000);
     }
@@ -121,18 +112,18 @@ export function UpdateChecker() {
     <div style={styles.banner}>
       {state === 'available' && (
         <div style={styles.row}>
-          <span>Update available: <strong>v{version}</strong></span>
+          <span>Nova versão do Jarvis: <strong>v{version}</strong></span>
           <div style={styles.actions}>
-            <button style={styles.primaryBtn} onClick={handleDownload}>Download</button>
-            <button style={styles.secondaryBtn} onClick={() => setDismissed(true)}>Later</button>
-            <button style={styles.muteBtn} onClick={handleDisable}>Disable auto-updates</button>
+            <button style={styles.primaryBtn} onClick={handleDownload}>Atualizar</button>
+            <button style={styles.secondaryBtn} onClick={() => setDismissed(true)}>Depois</button>
+            <button style={styles.muteBtn} onClick={handleDisable}>Desativar atualizações</button>
           </div>
         </div>
       )}
 
       {state === 'downloading' && (
         <div style={styles.row}>
-          <span>Downloading update... {progress}%</span>
+          <span>Atualizando o Jarvis para a v{version}... ele vai fechar e abrir sozinho.</span>
           <div style={styles.progressBar}>
             <div style={{ ...styles.progressFill, width: `${progress}%` }} />
           </div>
@@ -141,17 +132,17 @@ export function UpdateChecker() {
 
       {state === 'ready' && (
         <div style={styles.row}>
-          <span style={{ color: '#a6e3a1' }}>Update installed.</span>
+          <span style={{ color: '#a6e3a1' }}>Atualização instalada.</span>
           <div style={styles.actions}>
-            <button style={styles.successBtn} onClick={handleRelaunch}>Relaunch now</button>
-            <button style={styles.secondaryBtn} onClick={() => setDismissed(true)}>Later</button>
+            <button style={styles.successBtn} onClick={handleRelaunch}>Reiniciar agora</button>
+            <button style={styles.secondaryBtn} onClick={() => setDismissed(true)}>Depois</button>
           </div>
         </div>
       )}
 
       {state === 'error' && (
         <div style={styles.row}>
-          <span style={{ color: '#f38ba8' }}>Update error: {errorMsg}</span>
+          <span style={{ color: '#f38ba8' }}>Erro na atualização: {errorMsg}</span>
         </div>
       )}
     </div>
@@ -160,6 +151,12 @@ export function UpdateChecker() {
 
 const styles: Record<string, React.CSSProperties> = {
   banner: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    color: '#d8f3ff',
     padding: '10px 24px',
     backgroundColor: '#181825',
     borderBottom: '1px solid #313244',

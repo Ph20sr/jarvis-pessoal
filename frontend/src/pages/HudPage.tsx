@@ -14,6 +14,7 @@ import { MessageSquare, Mic, Send, Volume2, VolumeX, Ear, EarOff } from 'lucide-
 import { streamChat } from '../lib/sse';
 import {
   checkHealth,
+  fetchServerInfo,
   fetchSpeechHealth,
   fetchTtsHealth,
   synthesizeSpeech,
@@ -109,8 +110,23 @@ const SRCtor: (new () => SR) | undefined =
 
 export function HudPage() {
   const navigate = useNavigate();
-  const selectedModel = useAppStore((s) => s.selectedModel);
+  const pickedModel = useAppStore((s) => s.selectedModel);
   const serverInfo = useAppStore((s) => s.serverInfo);
+  // O HUD sempre usa o cérebro configurado no núcleo (ex.: Gemini); o modelo
+  // escolhido no chat só vale se o núcleo ainda não respondeu.
+  const selectedModel = serverInfo?.model || pickedModel;
+
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      fetchServerInfo()
+        .then((info) => alive && useAppStore.getState().setServerInfo(info))
+        .catch(() => alive && window.setTimeout(load, 3000));
+    load();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const [core, setCore] = useState<CoreState>('idle');
   const [caption, setCaption] = useState('');

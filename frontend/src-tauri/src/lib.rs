@@ -1054,6 +1054,90 @@ fn check_jarvis_port_available() -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Jarvis Pessoal: atualização automática pelo GitHub (sem chave de assinatura)
+// ---------------------------------------------------------------------------
+
+const JARVIS_RELEASE_BASE: &str =
+    "https://github.com/Ph20sr/jarvis-pessoal/releases/download/app-latest";
+
+fn version_tuple(v: &str) -> Vec<u64> {
+    v.trim()
+        .trim_start_matches('v')
+        .split('.')
+        .map(|p| p.trim().parse::<u64>().unwrap_or(0))
+        .collect()
+}
+
+/// Versão nova publicada, ou None se o app já está em dia.
+#[tauri::command]
+async fn jarvis_check_update(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let current = app.package_info().version.to_string();
+    let latest = reqwest::Client::new()
+        .get(format!("{JARVIS_RELEASE_BASE}/version.txt"))
+        .header("User-Agent", "jarvis-pessoal")
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?
+        .text()
+        .await
+        .map_err(|e| e.to_string())?;
+    let latest = latest.trim().to_string();
+    if !latest.is_empty() && version_tuple(&latest) > version_tuple(&current) {
+        Ok(Some(latest))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Baixa o instalador novo, instala em silêncio e reabre o Jarvis.
+#[tauri::command]
+async fn jarvis_install_update(app: tauri::AppHandle) -> Result<(), String> {
+    let bytes = reqwest::Client::new()
+        .get(format!("{JARVIS_RELEASE_BASE}/Jarvis-Instalador.exe"))
+        .header("User-Agent", "jarvis-pessoal")
+        .timeout(Duration::from_secs(600))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?
+        .bytes()
+        .await
+        .map_err(|e| e.to_string())?;
+    let installer = std::env::temp_dir().join("Jarvis-Atualizacao.exe");
+    std::fs::write(&installer, &bytes).map_err(|e| e.to_string())?;
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        // Espera o app fechar, instala em silêncio (/S) e abre o Jarvis de novo.
+        let script = format!(
+            "timeout /t 2 /nobreak >nul & \"{}\" /S & start \"\" \"{}\"",
+            installer.display(),
+            exe.display()
+        );
+        std::process::Command::new("cmd")
+            .args(["/C", &script])
+            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = exe;
+        return Err("Atualização automática só no Windows.".into());
+    }
+    #[allow(unreachable_code)]
+    {
+        app.exit(0);
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Backend boot sequence (runs in background after app launch)
 // ---------------------------------------------------------------------------
 
@@ -1066,7 +1150,33 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
         return;
     };
     let mut pending_rollback = PendingInferenceRollback::new(&cfg);
-    let plan = boot_plan(&cfg, total_ram_gb());
+    let mut plan = boot_plan(&cfg, total_ram_gb());
+    // Jarvis Pessoal: com uma chave do Gemini salva, o cérebro é o Gemini
+    // (rápido e grátis) e o Ollama não é ligado, para não pesar no PC.
+    if matches!(cfg.kind, SourceKind::Ollama) {
+        let has_gemini = read_cloud_keys()
+            .iter()
+            .any(|(k, v)| (k == "GEMINI_API_KEY" || k == "GOOGLE_API_KEY") && !v.is_empty());
+        if has_gemini {
+            let model = std::env::var("JARVIS_GEMINI_MODEL")
+                .ok()
+                .filter(|m| !m.is_empty())
+                .unwrap_or_else(|| "gemini-2.5-flash".to_string());
+            plan = BootPlan {
+                launch_ollama: false,
+                model_to_pull: None,
+                engine_host: None,
+                serve_args: vec![
+                    "--engine".into(),
+                    "cloud".into(),
+                    "--model".into(),
+                    model,
+                    "--agent".into(),
+                    "orchestrator".into(),
+                ],
+            };
+        }
+    }
     {
         let mut s = status.lock().await;
         *s = SetupStatus::starting(&cfg);
@@ -3484,6 +3594,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            jarvis_check_update,
+            jarvis_install_update,
             get_setup_status,
             get_api_base,
             start_backend,

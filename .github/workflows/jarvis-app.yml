@@ -48,19 +48,22 @@ jobs:
 
       - name: Gerar instalador
         working-directory: frontend
-        run: npx tauri build --bundles nsis
+        shell: bash
+        run: npx tauri build --bundles nsis --config "{\"version\":\"1.1.${{ github.run_number }}\"}"
 
       - name: Separar instalador
         shell: bash
         run: |
           mkdir out
           cp frontend/src-tauri/target/release/bundle/nsis/*.exe out/Jarvis-Instalador.exe
+          # O app compara esta versão com a dele e se atualiza sozinho.
+          printf '1.1.%s' "${{ github.run_number }}" > out/version.txt
           ls -la out
 
       - uses: actions/upload-artifact@v4
         with:
           name: Jarvis-Instalador
-          path: out/Jarvis-Instalador.exe
+          path: out/
 
       - name: Publicar na release app-latest
         shell: bash
@@ -68,6 +71,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete app-latest --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
-          gh release create app-latest out/Jarvis-Instalador.exe --repo "$GITHUB_REPOSITORY" \
+          gh release create app-latest out/* --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" --title "Jarvis para Windows" \
             --notes "Instalador do aplicativo Jarvis. Baixe Jarvis-Instalador.exe e abra."
