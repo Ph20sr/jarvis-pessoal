@@ -15,7 +15,7 @@ Assistente pessoal por voz, em português, que roda no seu PC. É construído em
 
 Dê dois cliques no **`Jarvis.exe`**. Pode deixar ele em qualquer lugar (Área de Trabalho, por exemplo).
 
-Na primeira vez ele instala o que falta (Git, uv, Node.js, Ollama, eSpeak), baixa este projeto para `%LOCALAPPDATA%\JarvisPessoal`, prepara o Python, configura em português e baixa o modelo de IA (uns 3 GB). Nas próximas vezes ele só procura atualizações e abre a tela de comando no navegador.
+Na primeira vez ele instala o que falta (Git, uv, Node.js, Ollama, eSpeak), baixa este projeto para `%LOCALAPPDATA%\JarvisPessoal`, prepara o Python, configura em português e baixa o modelo de IA (uns 3 GB). Nas próximas vezes ele só procura atualizações e abre o Jarvis numa janela própria de aplicativo (sem abas nem barra de endereço). Para sair, feche a janela do Jarvis: o núcleo desliga junto. Na primeira vez a janela pede permissão do microfone; aceite e ela fica salva.
 
 Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações > Executar assim mesmo** (o programa não é assinado digitalmente). O `iniciar-jarvis.bat` faz a mesma coisa, se preferir.
 

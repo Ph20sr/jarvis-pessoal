@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -184,13 +185,35 @@ func main() {
 		_ = run("", "ollama", "pull", model)
 	}
 
-	// 6. abre a tela de comando
+	// 6. liga o núcleo e abre o Jarvis como aplicativo
 	fmt.Println()
-	say("Abrindo a tela de comando. Deixe esta janela aberta enquanto usa o Jarvis.")
-	say("O núcleo leva uns 30 segundos para ligar: se a tela mostrar erro de conexão no começo, espere.")
-	fmt.Println()
-	if err := run(dir, "uv", "run", "jarvis", "gui"); err != nil {
-		fail("O Jarvis fechou com erro. Veja as mensagens acima.")
+	say("Ligando o núcleo do Jarvis (uns 30 segundos)...")
+	gui := exec.Command("uv", "run", "jarvis", "gui", "--no-browser")
+	gui.Dir = dir
+	gui.Stdout, gui.Stderr = os.Stdout, os.Stderr
+	if err := gui.Start(); err != nil {
+		fail("Não consegui ligar o Jarvis: " + err.Error())
 	}
+	done := make(chan error, 1)
+	go func() { done <- gui.Wait() }()
+
+	if !ready(appURL, 5*time.Minute) || !ready(healthURL, 5*time.Minute) {
+		say("O núcleo demorou demais para ligar. Veja as mensagens acima.")
+	}
+	select {
+	case <-done:
+		fail("O Jarvis fechou com erro. Veja as mensagens acima.")
+	default:
+	}
+
+	profile := filepath.Join(os.Getenv("LOCALAPPDATA"), "JarvisPessoal", "janela")
+	say("Pronto! Abrindo o Jarvis. Para sair, é só fechar a janela dele.")
+	minimizeConsole()
+	if openAppWindow(profile) {
+		killTree(gui.Process.Pid)
+		return
+	}
+	say("Não achei o Edge nem o Chrome. Abra %s no navegador.", appURL)
+	<-done
 	pause()
 }
