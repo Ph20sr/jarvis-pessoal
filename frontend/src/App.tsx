@@ -144,12 +144,14 @@ export default function App() {
   }, [optInEnabled, optInDisplayName, optInEmail, optInAnonId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wait for desktop setup before fetching identity or marking the dialog seen.
-  useEffect(() => offerAnalyticsChoice({
+  // Jarvis pessoal: sem convite de analytics/sorteio (nada é enviado para fora).
+  const ANALYTICS_INVITE_ENABLED = false;
+  useEffect(() => ANALYTICS_INVITE_ENABLED ? offerAnalyticsChoice({
     ready: setupDone,
     sharingModalSeen: optInModalSeen,
     open: () => setOptInModalOpen(true),
     markSharingModalSeen: markOptInModalSeen,
-  }), [setupDone, optInModalSeen, setOptInModalOpen, markOptInModalSeen]);
+  }) : undefined, [setupDone, optInModalSeen, setOptInModalOpen, markOptInModalSeen]);
 
   // Fire model_changed when the user switches models. First mount is
   // not a "change" — only emit when both prev and current are real and
