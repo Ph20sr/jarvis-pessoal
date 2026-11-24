@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Routes, Route } from 'react-router';
+import { Routes, Route, useLocation, useNavigate } from 'react-router';
 import { Layout } from './components/Layout';
 import { ChatPage } from './pages/ChatPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -8,6 +8,7 @@ import { GetStartedPage } from './pages/GetStartedPage';
 import { AgentsPage } from './pages/AgentsPage';
 import { DataSourcesPage } from './pages/DataSourcesPage';
 import { LogsPage } from './pages/LogsPage';
+import { HudPage } from './pages/HudPage';
 import { CommandPalette } from './components/CommandPalette';
 import { SetupScreen } from './components/SetupScreen';
 import { Toaster } from './components/ui/sonner';
@@ -47,6 +48,21 @@ export default function App() {
   const setOptInModalOpen = useAppStore((s) => s.setOptInModalOpen);
   const markOptInModalSeen = useAppStore((s) => s.markOptInModalSeen);
   const savings = useAppStore((s) => s.savings);
+
+  // Jarvis pessoal: abre a tela de comando (HUD) na primeira visita da sessão.
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!setupDone || location.pathname !== '/') return;
+    let shown = false;
+    try {
+      shown = sessionStorage.getItem('hud-shown') === '1';
+      sessionStorage.setItem('hud-shown', '1');
+    } catch {
+      /* sem sessionStorage: abre o HUD mesmo assim */
+    }
+    if (!shown) navigate('/hud', { replace: true });
+  }, [setupDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply theme class to <html>
   useEffect(() => {
@@ -192,6 +208,7 @@ export default function App() {
     <>
       <UpdateChecker />
       <Routes>
+        <Route path="hud" element={<HudPage />} />
         <Route element={<Layout />}>
           <Route index element={<ChatPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
