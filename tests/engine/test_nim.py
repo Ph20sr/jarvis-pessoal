@@ -168,7 +168,15 @@ async def test_non_gateway_status_is_preserved(respx_mock, status, method) -> No
         engine.close()
 
 
-def test_health_falls_back_to_models(respx_mock) -> None:
+def test_hosted_nim_without_key_is_not_healthy(monkeypatch) -> None:
+    monkeypatch.delenv("NIM_API_KEY", raising=False)
+    engine = NIMEngine(host="https://integrate.api.nvidia.com")
+    assert engine.health() is False
+    engine.close()
+
+
+def test_health_falls_back_to_models(respx_mock, monkeypatch) -> None:
+    monkeypatch.setenv("NIM_API_KEY", "test-key")
     respx_mock.get(f"{_HOST}/v1/health/ready").mock(return_value=httpx.Response(404))
     models = respx_mock.get(f"{_HOST}/v1/models").mock(
         return_value=httpx.Response(200, json={"data": []})

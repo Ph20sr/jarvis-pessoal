@@ -287,6 +287,11 @@ class NIMEngine(InferenceEngine):
         return [m["id"] for m in data.get("data", [])]
 
     def health(self) -> bool:
+        # NVIDIA's hosted catalog answers /v1/models without a key, which made
+        # an unconfigured NIM look healthy and hijack chats (every reply 404'd).
+        # Only count the hosted endpoint as available when a key is set.
+        if self.is_cloud and not self._api_key:
+            return False
         try:
             resp = self._client.get(
                 f"{self._api_prefix}/health/ready",
