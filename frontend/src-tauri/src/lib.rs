@@ -950,6 +950,7 @@ fn looks_like_rust_extension_build_error(stderr: &str) -> bool {
     .any(|marker| lower.contains(marker))
 }
 
+#[allow(dead_code)]
 fn format_missing_rust_toolchain() -> String {
     format!(
         "Could not find Rust's `cargo` command. {}\n\n\
@@ -1502,12 +1503,7 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
 
     let root = project_root.as_ref().unwrap();
 
-    let cargo_bin = resolve_bin("cargo");
-    if !std::path::Path::new(&cargo_bin).exists() && cargo_bin == "cargo" {
-        let mut s = status.lock().await;
-        s.error = Some(format_missing_rust_toolchain());
-        return;
-    }
+    // Jarvis Pessoal: não exige Rust/cargo — a extensão nativa não é usada.
 
     // Install dependencies automatically (handles fresh clones).
     //
