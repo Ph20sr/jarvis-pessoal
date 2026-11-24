@@ -29,6 +29,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: npm 11
+        run: npm install --global npm@11.19.0
+
       - name: Instalar dependências da interface
         working-directory: frontend
         run: npm ci
