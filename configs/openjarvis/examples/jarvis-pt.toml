@@ -1,0 +1,56 @@
+# Jarvis Pessoal (pt-BR) — assistente de voz que controla o PC, 100% grátis
+# Instalar:  jarvis init --preset jarvis-pt --force
+# Depois:    jarvis gui   (abre a tela de comando HUD no navegador)
+#
+# Tudo roda no seu computador: IA local pelo Ollama, reconhecimento de voz
+# local (faster-whisper) e voz local (Kokoro, voz brasileira). Nada é pago.
+
+[engine]
+default = "ollama"
+
+[intelligence]
+# Modelo local. Troque conforme sua máquina:
+#   qwen3.5:4b  -> leve, roda em quase qualquer PC (8 GB de RAM)
+#   qwen3.5:9b  -> melhor, ideal com placa de vídeo de 8 GB+
+default_model = "qwen3.5:4b"
+temperature = 0.6
+max_tokens = 1024
+
+[agent]
+default_agent = "orchestrator"      # usa ferramentas em vários passos
+max_turns = 6
+context_from_memory = true
+default_system_prompt = """
+Você é o Jarvis, o assistente pessoal do usuário, rodando no computador dele.
+Personalidade: leal, calmo, eficiente e com um humor seco e elegante. Você trata o usuário com respeito e proximidade, como um mordomo brilhante que também é amigo.
+Fale sempre em português do Brasil.
+Suas respostas quase sempre são faladas em voz alta: seja breve (1 a 3 frases), sem markdown, sem listas, sem emojis e sem links crus, a não ser que peçam detalhes.
+Quando uma ferramenta resolver o pedido, use a ferramenta em vez de explicar. Depois confirme em poucas palavras o que fez.
+Use a busca na web para notícias, cotações, placares e qualquer coisa atual.
+Quando o usuário contar algo duradouro sobre ele (gostos, rotina, pessoas), guarde na memória.
+Se algo ainda não for possível, diga com honestidade e sugira a alternativa mais próxima.
+"""
+
+[tools]
+enabled = [
+  "open_app", "open_url", "media_control", "lock_screen", "weather_free",
+  "web_search", "calculator", "memory_manage", "think",
+]
+
+[speech]
+backend = "faster-whisper"
+model = "small"          # "base" é mais rápido, "small" entende melhor português
+language = "pt"
+device = "auto"
+compute_type = "int8"    # funciona em CPU
+tts_backend = "kokoro"
+voice_id = "pm_alex"     # voz masculina brasileira (feminina: pf_dora)
+voice_speed = 1.05
+
+[system_prompt]
+include_current_time = true
+timezone = "America/Sao_Paulo"
+
+[server]
+host = "127.0.0.1"
+port = 8000
