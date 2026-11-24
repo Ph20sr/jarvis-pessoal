@@ -13,10 +13,11 @@ Assistente pessoal por voz, em português, que roda no seu PC. É construído em
 
 ## Instalar no Windows
 
-1. Baixe este repositório (botão verde **Code > Download ZIP**, ou `git clone`).
-2. Dê dois cliques em **`iniciar-jarvis.bat`**.
+Dê dois cliques no **`Jarvis.exe`**. Pode deixar ele em qualquer lugar (Área de Trabalho, por exemplo).
 
-Na primeira vez ele instala o que falta (uv, Ollama, Node.js, eSpeak), prepara o Python, configura em português e baixa o modelo de IA (uns 3 GB). Depois disso, é só abrir o mesmo arquivo. A tela de comando abre no navegador.
+Na primeira vez ele instala o que falta (Git, uv, Node.js, Ollama, eSpeak), baixa este projeto para `%LOCALAPPDATA%\JarvisPessoal`, prepara o Python, configura em português e baixa o modelo de IA (uns 3 GB). Nas próximas vezes ele só procura atualizações e abre a tela de comando no navegador.
+
+Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações > Executar assim mesmo** (o programa não é assinado digitalmente). O `iniciar-jarvis.bat` faz a mesma coisa, se preferir.
 
 **Máquina:** 8 GB de RAM já rodam o modelo `qwen3.5:4b`. Com placa de vídeo de 8 GB ou mais, troque para `qwen3.5:9b` em `%USERPROFILE%\.openjarvis\config.toml`, que entende bem melhor.
 
@@ -46,6 +47,7 @@ Se o PC for fraco, dá pra usar o Google Gemini no plano gratuito: abra **Settin
 | `frontend/src/pages/HudPage.tsx`, `hud.css` | Tela de comando |
 | `src/openjarvis/tools/pc_control.py` | Ferramentas de controle do PC e clima |
 | `configs/openjarvis/examples/jarvis-pt.toml` | Preset em português |
-| `iniciar-jarvis.bat` | Instalador e inicializador do Windows |
+| `Jarvis.exe` (código em `launcher/`) | Instalador, atualizador e inicializador do Windows |
+| `iniciar-jarvis.bat` | Alternativa em .bat |
 
 O resto é o OpenJarvis original. Veja o `README.md` para a documentação completa dele.
