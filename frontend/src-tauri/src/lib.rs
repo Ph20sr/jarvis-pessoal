@@ -1137,6 +1137,32 @@ async fn jarvis_install_update(app: tauri::AppHandle) -> Result<(), String> {
     }
 }
 
+/// Encerra núcleos antigos do Jarvis (python/uv rodando `jarvis serve|start|gui`).
+async fn stop_stale_jarvis_servers() {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let script = "Get-CimInstance Win32_Process | Where-Object { \
+            $_.ProcessId -ne $PID -and $_.Name -match '^(python|pythonw|uv|jarvis)(\\.exe)?$' -and \
+            $_.CommandLine -match 'jarvis' -and $_.CommandLine -match '\\b(serve|start|gui)\\b' } | \
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }";
+        let _ = tokio::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .creation_flags(0x0800_0000)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .await;
+        // Dá um tempo para o Windows liberar a porta.
+        for _ in 0..20 {
+            if std::net::TcpListener::bind(("127.0.0.1", JARVIS_PORT)).is_ok() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Backend boot sequence (runs in background after app launch)
 // ---------------------------------------------------------------------------
@@ -1483,6 +1509,12 @@ async fn boot_backend(backend: SharedBackend, status: SharedStatus) {
             }
         }
     }
+
+    // Jarvis Pessoal: um núcleo antigo (de uma abertura anterior, do
+    // Jarvis.exe antigo ou de uma atualização) pode ter ficado preso na porta
+    // 8000. Encerra só processos do próprio Jarvis e sobe um núcleo novo, para
+    // que mudanças como o Gemini passem a valer.
+    stop_stale_jarvis_servers().await;
 
     // If something is already serving on our port, decide what to do based
     // on what it actually responds with — don't blindly kill it (#455).
