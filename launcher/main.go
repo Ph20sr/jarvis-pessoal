@@ -57,6 +57,31 @@ func winget(id, label string) {
 		"--accept-package-agreements", "--accept-source-agreements")
 }
 
+// installOllama baixa o instalador oficial e roda na tela (instala só para o
+// usuário, sem precisar de administrador). O winget silencioso costuma ser
+// cancelado pelo Windows (código 5), então ele fica só como plano B.
+func installOllama(local string) {
+	setup := filepath.Join(os.TempDir(), "OllamaSetup.exe")
+	say("Baixando o Ollama (IA local)...")
+	dl := exec.Command("powershell", "-NoProfile", "-Command",
+		"$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing "+
+			"-Uri https://ollama.com/download/OllamaSetup.exe -OutFile '"+setup+"'")
+	dl.Stdout, dl.Stderr = os.Stdout, os.Stderr
+	if err := dl.Run(); err == nil {
+		say("Abrindo o instalador do Ollama. Clique em Install e espere terminar.")
+		_ = run("", setup)
+		os.Remove(setup)
+	}
+	if !has("ollama") {
+		if _, err := os.Stat(filepath.Join(local, "Programs", "Ollama", "ollama.exe")); err == nil {
+			return
+		}
+		say("Tentando pelo winget...")
+		_ = run("", "winget", "install", "-e", "--id", "Ollama.Ollama",
+			"--accept-package-agreements", "--accept-source-agreements")
+	}
+}
+
 func fail(msg string) {
 	fmt.Println()
 	say("ERRO: %s", msg)
@@ -105,15 +130,21 @@ func main() {
 		winget("OpenJS.NodeJS.LTS", "Node.js")
 	}
 	if !has("ollama") {
-		winget("Ollama.Ollama", "Ollama (IA local)")
+		installOllama(local)
 	}
 	if !has("espeak-ng") {
 		winget("eSpeak-NG.eSpeak-NG", "eSpeak NG (voz brasileira)")
 	}
-	for _, tool := range []string{"git", "uv", "node", "ollama"} {
+	for _, tool := range []string{"git", "uv", "node"} {
 		if !has(tool) {
 			fail(fmt.Sprintf("Não encontrei o %s depois de instalar. Feche e abra o Jarvis.exe de novo.", tool))
 		}
+	}
+	// o Ollama pode ficar para depois: sem ele, dá pra usar o Gemini nas Settings
+	semOllama := !has("ollama")
+	if semOllama {
+		say("AVISO: o Ollama não foi instalado. Instale em https://ollama.com/download")
+		say("ou use o Gemini em Settings > provedores de nuvem. Continuando...")
 	}
 
 	// 2. projeto: baixa ou atualiza
@@ -142,7 +173,7 @@ func main() {
 	}
 
 	// 5. modelo de IA
-	if !strings.Contains(output("", "ollama", "list"), model) {
+	if !semOllama && !strings.Contains(output("", "ollama", "list"), model) {
 		say("Baixando o modelo de IA %s (uns 3 GB, só na primeira vez)...", model)
 		_ = run("", "ollama", "pull", model)
 	}
