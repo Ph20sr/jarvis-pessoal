@@ -15,6 +15,9 @@ import { streamChat } from '../lib/sse';
 import {
   checkHealth,
   fetchServerInfo,
+  getCloudKeyStatus,
+  isTauri,
+  saveCloudKey,
   fetchSpeechHealth,
   fetchTtsHealth,
   synthesizeSpeech,
@@ -115,6 +118,33 @@ export function HudPage() {
   // O HUD sempre usa o cérebro configurado no núcleo (ex.: Gemini); o modelo
   // escolhido no chat só vale se o núcleo ainda não respondeu.
   const selectedModel = serverInfo?.model || pickedModel;
+
+  // Jarvis Pessoal: sem chave do Gemini o núcleo cai no Ollama local, que é
+  // lento (ou quebrado) neste PC. Pede a chave aqui mesmo, na tela principal.
+  const [needGeminiKey, setNeedGeminiKey] = useState(false);
+  const [geminiKey, setGeminiKey] = useState('');
+  const [geminiMsg, setGeminiMsg] = useState('');
+  useEffect(() => {
+    if (!isTauri()) return;
+    getCloudKeyStatus()
+      .then((st) => setNeedGeminiKey(!st.GEMINI_API_KEY && !st.GOOGLE_API_KEY))
+      .catch(() => {});
+  }, []);
+  const saveGemini = async () => {
+    const key = geminiKey.trim();
+    if (key.length < 20) {
+      setGeminiMsg('Essa chave parece incompleta. Copie ela inteira.');
+      return;
+    }
+    try {
+      setGeminiMsg('Salvando e reiniciando o Jarvis...');
+      await saveCloudKey('GEMINI_API_KEY', key);
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('jarvis_restart_app');
+    } catch (e) {
+      setGeminiMsg(`Não consegui salvar: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -809,6 +839,52 @@ export function HudPage() {
           </dl>
         </div>
       </section>
+
+      {needGeminiKey && (
+        <div className="hud-keygate" role="dialog" aria-label="Chave do Gemini">
+          <div className="hud-keygate-box">
+            <div className="hud-card-title">Ativar o cérebro do Jarvis</div>
+            <p>
+              Para responder rápido e bem, o Jarvis usa o Gemini do Google, de graça. Cole aqui a sua chave do
+              Gemini. Ela fica guardada só neste computador.
+            </p>
+            <p className="hud-sub">
+              Não tem a chave? Crie grátis em{' '}
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  import('@tauri-apps/plugin-shell')
+                    .then(({ open }) => open('https://aistudio.google.com/apikey'))
+                    .catch(() => window.open('https://aistudio.google.com/apikey', '_blank'));
+                }}
+              >
+                aistudio.google.com/apikey
+              </a>{' '}
+              (botão "Create API key").
+            </p>
+            <div className="hud-form">
+              <input
+                type="password"
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void saveGemini()}
+                placeholder="Cole a chave aqui (começa com AI...)"
+                autoFocus
+              />
+              <button type="button" className="hud-chip on" onClick={() => void saveGemini()}>
+                Salvar
+              </button>
+            </div>
+            {geminiMsg && <p className="hud-sub">{geminiMsg}</p>}
+            <button type="button" className="hud-chip" onClick={() => setNeedGeminiKey(false)}>
+              Agora não
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="hud-center">
         <canvas ref={canvasRef} className="hud-core" onClick={listen} aria-label="Núcleo: clique para falar" />

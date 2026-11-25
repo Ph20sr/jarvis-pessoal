@@ -1068,6 +1068,12 @@ fn version_tuple(v: &str) -> Vec<u64> {
         .collect()
 }
 
+/// Reinicia o app (usado depois de salvar a chave do Gemini).
+#[tauri::command]
+fn jarvis_restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 /// Versão nova publicada, ou None se o app já está em dia.
 #[tauri::command]
 async fn jarvis_check_update(app: tauri::AppHandle) -> Result<Option<String>, String> {
@@ -3628,6 +3634,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             jarvis_check_update,
             jarvis_install_update,
+            jarvis_restart_app,
             get_setup_status,
             get_api_base,
             start_backend,
